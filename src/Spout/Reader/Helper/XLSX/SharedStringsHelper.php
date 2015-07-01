@@ -112,7 +112,7 @@ class SharedStringsHelper
         $escaper = new \Box\Spout\Common\Escaper\XLSX();
 
         $sharedStringsFilePath = $this->getSharedStringsFilePath();
-        if ($xmlReader->open($sharedStringsFilePath, null, LIBXML_NONET) === false) {
+        if ($xmlReader->open($sharedStringsFilePath, null, LIBXML_NOENT|LIBXML_NONET) === false) {
             throw new IOException('Could not open "' . self::SHARED_STRINGS_XML_FILE_PATH . '".');
         }
 
@@ -162,7 +162,7 @@ class SharedStringsHelper
     }
 
     /**
-     * @return string The path to the shared strings XML file.
+     * @return string The path to the shared strings XML file
      */
     protected function getSharedStringsFilePath()
     {
@@ -249,7 +249,7 @@ class SharedStringsHelper
     protected function getSharedStringTempFilePath($sharedStringIndex)
     {
         $numTempFile = intval($sharedStringIndex / self::MAX_NUM_STRINGS_PER_TEMP_FILE);
-        return $this->tempFolder . DIRECTORY_SEPARATOR . 'sharedstrings' . $numTempFile;
+        return $this->tempFolder . '/sharedstrings' . $numTempFile;
     }
 
     /**
