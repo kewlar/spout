@@ -70,17 +70,19 @@ class XLSX extends AbstractReader
      * and fetches all the available worksheets.
      *
      * @param  string $filePath Path of the file to be read
+     * @param int    $readerMethod Shared strings storage strategy to use. See SharedStringsHelper::USE_* constants.
+     *
      * @return void
      * @throws \Box\Spout\Common\Exception\IOException If the file at the given path or its content cannot be read
      * @throws Exception\NoWorksheetsFoundException If there are no worksheets in the file
      */
-    protected function openReader($filePath)
+    protected function openReader($filePath, $readerMethod)
     {
         $this->filePath = $filePath;
         $this->zip = new \ZipArchive();
 
         if ($this->zip->open($filePath) === true) {
-            $this->sharedStringsHelper = new SharedStringsHelper($filePath, $this->tempFolder);
+            $this->sharedStringsHelper = new SharedStringsHelper($filePath, $this->tempFolder, $readerMethod);
 
             if ($this->sharedStringsHelper->hasSharedStrings()) {
                 // Extracts all the strings from the worksheets for easy access in the future

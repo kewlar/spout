@@ -34,6 +34,10 @@ class SharedStringsHelper
     /** Value to use to escape the line feed character ("\n") */
     const ESCAPED_LINE_FEED_CHARACTER = '_x000A_';
 
+    const USE_FILES = 0;
+    const USE_ARRAY = 1;
+    const USE_SPL_ARRAY = 2;
+
     /** @var string Path of the XLSX file being read */
     protected $filePath;
 
@@ -58,17 +62,22 @@ class SharedStringsHelper
      */
     protected $inMemoryTempFileContents;
 
+    protected $stringStorageMethod = self::USE_FILES;
+    protected $inMemoryStrings = [];
+    protected $inMemoryStringCount = 0;
+
     /**
      * @param string $filePath Path of the XLSX file being read
      * @param string|void $tempFolder Temporary folder where the temporary files to store shared strings will be stored
      */
-    public function __construct($filePath, $tempFolder = null)
+    public function __construct($filePath, $tempFolder = null, $stringStorageMethod = self::USE_FILES)
     {
         $this->filePath = $filePath;
 
         $rootTempFolder = ($tempFolder) ?: sys_get_temp_dir();
         $this->fileSystemHelper = new FileSystemHelper($rootTempFolder);
         $this->tempFolder = $this->fileSystemHelper->createFolder($rootTempFolder, uniqid('sharedstrings'));
+        $this->stringStorageMethod = $stringStorageMethod ?: self::USE_FILES;
     }
 
     /**
@@ -120,6 +129,10 @@ class SharedStringsHelper
             // do nothing until a 'si' tag is reached
         }
 
+        if ($this->stringStorageMethod === self::USE_SPL_ARRAY) {
+            $this->inMemoryStrings = new \SplFixedArray();
+        }
+
         while ($xmlReader->name === 'si') {
             $node = new \SimpleXMLElement($xmlReader->readOuterXml());
             $node->registerXPathNamespace('ns', self::MAIN_NAMESPACE_FOR_SHARED_STRINGS_XML);
@@ -141,11 +154,22 @@ class SharedStringsHelper
 
             $unescapedTextValue = $escaper->unescape($textValue);
 
-            // The shared string retrieval logic expects each cell data to be on one line only
-            // Encoding the line feed character allows to preserve this assumption
-            $lineFeedEncodedTextValue = $this->escapeLineFeed($unescapedTextValue);
-
-            $this->writeSharedStringToTempFile($lineFeedEncodedTextValue, $sharedStringIndex);
+            switch ($this->stringStorageMethod) {
+                case self::USE_ARRAY:
+                    $this->inMemoryStrings[$sharedStringIndex] = $unescapedTextValue;
+                    break;
+                case self::USE_SPL_ARRAY:
+                    $this->inMemoryStrings->setSize($sharedStringIndex + 1);
+                    $this->inMemoryStrings[$sharedStringIndex] = $unescapedTextValue;
+                    break;
+                case self::USE_FILES:
+                default:
+                    // The shared string retrieval logic expects each cell data to be on one line only
+                    // Encoding the line feed character allows to preserve this assumption
+                    $lineFeedEncodedTextValue = $this->escapeLineFeed($unescapedTextValue);
+                    $this->writeSharedStringToTempFile($lineFeedEncodedTextValue, $sharedStringIndex);
+                    break;
+            }
 
             $sharedStringIndex++;
 
@@ -156,6 +180,15 @@ class SharedStringsHelper
         // close pointer to the last temp file that was written
         if ($this->tempFilePointer) {
             fclose($this->tempFilePointer);
+        }
+
+        switch ($this->stringStorageMethod) {
+            case self::USE_ARRAY:
+                $this->inMemoryStringCount = count($this->inMemoryStrings);
+                break;
+            case self::USE_SPL_ARRAY:
+                $this->inMemoryStringCount = $this->inMemoryStrings->getSize();
+                break;
         }
 
         $xmlReader->close();
@@ -262,6 +295,17 @@ class SharedStringsHelper
      */
     public function getStringAtIndex($sharedStringIndex)
     {
+        switch ($this->stringStorageMethod) {
+            case self::USE_ARRAY:
+            case self::USE_SPL_ARRAY:
+                if ($sharedStringIndex < $this->inMemoryStringCount) {
+                    return $this->inMemoryStrings[$sharedStringIndex];
+                }
+
+                throw new SharedStringNotFoundException("Shared string not found for index: $sharedStringIndex");
+                break;
+        }
+
         $tempFilePath = $this->getSharedStringTempFilePath($sharedStringIndex);
         $indexInFile = $sharedStringIndex % self::MAX_NUM_STRINGS_PER_TEMP_FILE;
 

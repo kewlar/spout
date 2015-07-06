@@ -33,9 +33,11 @@ abstract class AbstractReader implements ReaderInterface
      * Opens the file at the given file path to make it ready to be read
      *
      * @param  string $filePath Path of the file to be read
+     * @param int    $readerMethod Shared strings storage strategy to use. See SharedStringsHelper::USE_* constants.
+     *
      * @return void
      */
-    abstract protected function openReader($filePath);
+    abstract protected function openReader($filePath, $readerMethod);
 
     /**
      * Reads and returns next row if available.
@@ -65,11 +67,12 @@ abstract class AbstractReader implements ReaderInterface
      * Prepares the reader to read the given file. It also makes sure
      * that the file exists and is readable.
      *
-     * @param  string $filePath Path of the file to be read
-     * @return void
-     * @throws \Box\Spout\Common\Exception\IOException If the file at the given path does not exist, is not readable or is corrupted
+     * @param string $filePath     Path of the file to be read
+     * @param int    $readerMethod Shared strings storage strategy to use. See SharedStringsHelper::USE_* constants.
+     *
+     * @throws IOException
      */
-    public function open($filePath)
+    public function open($filePath, $readerMethod = null)
     {
         if (!$this->isPhpStream($filePath)) {
             // we skip the checks if the provided file path points to a PHP stream
@@ -84,7 +87,7 @@ abstract class AbstractReader implements ReaderInterface
         $this->hasReachedEndOfFile = false;
 
         try {
-            $this->openReader($filePath);
+            $this->openReader($filePath, $readerMethod);
             $this->isStreamOpened = true;
         } catch (\Exception $exception) {
             throw new IOException('Could not open ' . $filePath . ' for reading! (' . $exception->getMessage() . ')');
