@@ -50,6 +50,14 @@ class CachingStrategyFactory
      */
     const MAX_NUM_STRINGS_PER_TEMP_FILE = 10000;
 
+    /**
+     * Because in some cases it's better for the script to fail fast (with an out-of-memory error), instead of silently
+     * switch to a 1000x slower execution mode and continue for hours.
+     *
+     * Placed here as a class variable in order to be able to be overridden, if sorely needed.
+     */
+    public static $FORCE_IN_MEMORY_CACHING_STRATEGY = true;
+
     /** @var CachingStrategyFactory|null Singleton instance */
     protected static $instance = null;
 
@@ -84,7 +92,7 @@ class CachingStrategyFactory
      */
     public function getBestCachingStrategy($sharedStringsUniqueCount, $tempFolder = null)
     {
-        if ($this->isInMemoryStrategyUsageSafe($sharedStringsUniqueCount)) {
+        if (self::$FORCE_IN_MEMORY_CACHING_STRATEGY || $this->isInMemoryStrategyUsageSafe($sharedStringsUniqueCount)) {
             return new InMemoryStrategy($sharedStringsUniqueCount);
         } else {
             return new FileBasedStrategy($tempFolder, self::MAX_NUM_STRINGS_PER_TEMP_FILE);
